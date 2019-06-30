@@ -64,11 +64,10 @@ public class Main2Activity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        /*
         if (item.getItemId() == R.id.item8) {
             startActivity(new Intent(Main2Activity.this, Login.class));
             return true;
-        }*/
+        }
         if (item.getItemId() == R.id.item9) {
             // show dialog exit
             show_Dialog();
@@ -76,8 +75,6 @@ public class Main2Activity extends AppCompatActivity {
 
             return true;
         }
-
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -101,3 +98,4 @@ public class Main2Activity extends AppCompatActivity {
         alert.show();
     }
 }
+

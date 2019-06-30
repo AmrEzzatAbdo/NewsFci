@@ -1,10 +1,14 @@
 package amr.your.FciNews;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -17,6 +21,7 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.helper.ItemTouchHelper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -36,6 +41,8 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
     private DatabaseReference databaseReference;
     private static FirebaseRecyclerAdapter<Data, NewsViewHolder> firebaseRecyclerAdapter;
     static Activity context;
+    private ProgressDialog progressDialog;
+    private TextView emptyView;
 
 
     @Override
@@ -66,6 +75,10 @@ public class MainActivity extends AppCompatActivity {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
+
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setCancelable(false);
+        progressDialog.setMessage("يرجى الانتظار...");
 
         // hide the action bar
 
@@ -110,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
         searchInput = findViewById(R.id.search_input);
         NewsRecyclerview = findViewById(R.id.news_rv);
         mData = new ArrayList<>();
+        emptyView = findViewById(R.id.empty_view);
 
         // load theme state
 
@@ -133,6 +147,7 @@ public class MainActivity extends AppCompatActivity {
         layoutManager.setStackFromEnd(true);
         NewsRecyclerview.setHasFixedSize(true);
         NewsRecyclerview.setLayoutManager(layoutManager);
+        new ItemTouchHelper(itemTouchHelper).attachToRecyclerView(NewsRecyclerview);
 
         fabSwitcher.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -172,7 +187,6 @@ public class MainActivity extends AppCompatActivity {
             public void onTextChanged(CharSequence s, int start, int before, int count) {
 
 
-
             }
 
             @Override
@@ -200,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-
+        progressDialog.show();
         try {
             firebaseRecyclerAdapter = new FirebaseRecyclerAdapter<Data, NewsViewHolder>(Data.class, R.layout.item_news, NewsViewHolder.class, databaseReference) {
                 @Override
@@ -218,27 +232,27 @@ public class MainActivity extends AppCompatActivity {
                 }
             };
             NewsRecyclerview.setAdapter(firebaseRecyclerAdapter);
-/*
+
             databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                     try {
                         if (!dataSnapshot.exists()) {
-                            // emptyView.setVisibility(View.VISIBLE);
+                            emptyView.setVisibility(View.VISIBLE);
                         }
                         Toast.makeText(MainActivity.this, " Requst new data", Toast.LENGTH_SHORT).show();
                     } catch (Exception e) {
                         Log.e("emptyViewHome", "onDataChange: ", e);
                     }
 
-
+                    progressDialog.dismiss();
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError databaseError) {
 
                 }
-            });*/
+            });
 
 
         } catch (Exception e) {
@@ -328,7 +342,7 @@ public class MainActivity extends AppCompatActivity {
         Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         builder.setSound(alarmSound);
         //Vibration
-        builder.setVibrate(new long[]{1000, 1000, 1000, 1000, 1000});
+        builder.setVibrate(new long[]{500, 500, 500, 500, 500});
         //LED
         builder.setLights(Color.RED, 3000, 3000);
         builder.setOnlyAlertOnce(true);
@@ -336,5 +350,45 @@ public class MainActivity extends AppCompatActivity {
         Notification noti = builder.build();
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         notificationManager.notify(0, noti);
+    }
+
+    ItemTouchHelper.SimpleCallback itemTouchHelper = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT | ItemTouchHelper.LEFT) {
+        @Override
+        public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder viewHolder1) {
+            return false;
+        }
+
+        @Override
+        public void onSwiped(@NonNull final RecyclerView.ViewHolder viewHolder, int i) {
+            new AlertDialog.Builder(context)
+                    .setTitle("Delete entry")
+                    .setMessage("Are you sure you want to delete this entry?")
+                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            deleteEntry(viewHolder);
+                        }
+                    })
+
+                    // A null listener allows the button to dismiss the dialog and take no further action.
+                    .setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            dialog.cancel();
+                            firebaseRecyclerAdapter.notifyDataSetChanged();
+                        }
+                    })
+                    .setIcon(android.R.drawable.ic_dialog_alert)
+                    .show();
+        }
+    };
+
+    public void deleteEntry(RecyclerView.ViewHolder viewHolder) {
+        //delete data
+        firebaseRecyclerAdapter.getRef(viewHolder.getAdapterPosition()).removeValue();
+        //delete image
+        String currentImage = firebaseRecyclerAdapter.getItem(viewHolder.getAdapterPosition()).getImage();
+        StorageReference mPictureReference = FirebaseStorage.getInstance().getReferenceFromUrl(currentImage);
+        mPictureReference.delete();
+        firebaseRecyclerAdapter.notifyDataSetChanged();
     }
 }

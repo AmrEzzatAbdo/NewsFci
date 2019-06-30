@@ -1,5 +1,6 @@
 package amr.your.FciNews;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
@@ -46,6 +47,7 @@ public class PostActivity extends AppCompatActivity implements IPickResult, Adap
     Spinner spin;
     String[] bankNames = {"اخبارالجامعة", "الجامعة في عيون الصحافة", "الاداره العامه للتدريب", "مؤتمرات",
             "نتائج الجامعة", "الأحتفال السنوى بعيد العلم", "الموضوعات العامة", "منح ومهمات علمية"};
+    private ProgressDialog progressDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +75,8 @@ public class PostActivity extends AppCompatActivity implements IPickResult, Adap
         SimpleDateFormat df = new SimpleDateFormat("dd-MM-yyyy");
         tv_date.setText(df.format(CDate));
 
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setCancelable(false);
 
     }
 
@@ -150,6 +154,7 @@ public class PostActivity extends AppCompatActivity implements IPickResult, Adap
 
 
     private void StartPosting() {
+        progressDialog.setMessage("جارى النشر...");
         switch (spin.getSelectedItemPosition()) {
             case 0:
                 databaseReference = FirebaseDatabase.getInstance().getReference("facultyNews");
@@ -190,7 +195,9 @@ public class PostActivity extends AppCompatActivity implements IPickResult, Adap
         postDate = tv_date.getText().toString().trim();
         postLinkStr = postLink.getText().toString().trim();
 
-        if (!TextUtils.isEmpty(news_name) && !TextUtils.isEmpty(description) && !TextUtils.isEmpty(postDate) && !TextUtils.isEmpty(postLinkStr) && imageUri!=null) {
+        if (!TextUtils.isEmpty(news_name) && !TextUtils.isEmpty(description) && !TextUtils.isEmpty(postDate) && !TextUtils.isEmpty(postLinkStr) && imageUri != null) {
+            progressDialog.show();
+
             StorageReference filepath = mStorageRef.child("News_Images").child(imageUri.getLastPathSegment());
             filepath.putFile(imageUri).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                 @Override
@@ -206,6 +213,7 @@ public class PostActivity extends AppCompatActivity implements IPickResult, Adap
                     newPost.child("postLink").setValue(postLinkStr);
 
                     Toast.makeText(PostActivity.this, "Done", Toast.LENGTH_LONG).show();
+                    progressDialog.dismiss();
                 }
             });
 
